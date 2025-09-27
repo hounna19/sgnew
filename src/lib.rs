@@ -30,7 +30,12 @@ async fn main(req: Request, env: Env, _: Context) -> Result<Response> {
         .on_async("/", fe)
         .on_async("/sub", sub)
         .on("/link", link)
+        // existing generic route that handles /:proxyip (e.g. /ID, /KR, /US, or ip-port-like)
         .on_async("/:proxyip", tunnel)
+        // explicit aliases for protocols (will be handled by same tunnel handler)
+        .on_async("/vmess", tunnel)
+        .on_async("/vless", tunnel)
+        .on_async("/trojan", tunnel)
         .run(req, env)
         .await
 }
@@ -51,8 +56,49 @@ async fn sub(_: Request, cx: RouteContext<Config>) -> Result<Response> {
 
 
 async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> {
-    let mut proxyip = cx.param("proxyip").unwrap().to_string();
+    // ambil param path (bisa /ID, /vmess, /vless, /trojan, atau ip-PORT)
+    let mut proxyip = cx.param("proxyip").unwrap_or_default().to_string();
+
+    // default protocol label (bisa dipakai nanti kalau mau menyesuaikan behavior per protocol)
+    // contoh: "vmess", "vless", "trojan", atau empty jika tidak alias
+    let mut protocol = String::new();
+
+    // Jika route dipanggil via /vmess, /vless, /trojan (alias tanpa param),
+    // cx.param("proxyip") bisa kosong, jadi cek juga path dari request URL
+    if proxyip.is_empty() {
+        if let Ok(url) = req.url() {
+            if let Some(path) = url.path_segments().and_then(|mut it| it.next()) {
+                proxyip = path.to_string();
+            }
+        }
+    }
+
+    // Normalize lower/upper for matching aliases
+    let proxyip_lower = proxyip.to_lowercase();
+
+    // Map alias routes to the country code you want (di sini map semua alias -> "ID")
+    // Ubah "ID" jadi country/KV key lain sesuai akun masing-masing jika diperlukan.
+    match proxyip_lower.as_str() {
+        "vmess" => {
+            protocol = "vmess".to_string();
+            proxyip = "ID".to_string(); // map vmess -> use KV key "ID"
+        }
+        "vless" => {
+            protocol = "vless".to_string();
+            proxyip = "ID".to_string(); // map vless -> use KV key "ID"
+        }
+        "trojan" => {
+            protocol = "trojan".to_string();
+            proxyip = "ID".to_string(); // map trojan -> use KV key "ID"
+        }
+        _ => {
+            // jika bukan alias, tetap gunakan apa yang diberikan di path
+        }
+    }
+
+    // Kalau proxyip cocok pola 2 huruf (country code), ambil dari KV
     if PROXYKV_PATTERN.is_match(&proxyip)  {
+        // kvid_list dukung format "ID,KR" jika mau acak antar beberapa key
         let kvid_list: Vec<String> = proxyip.split(",").map(|s|s.to_string()).collect();
         let kv = cx.kv("SIREN")?;
         let mut proxy_kv_str = kv.get("proxy_kv").text().await?.unwrap_or("".to_string());
@@ -77,11 +123,12 @@ async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> 
         let kv_index = (rand_buf[0] as usize) % kvid_list.len();
         proxyip = kvid_list[kv_index].clone();
         
-        // select random proxy ip
+        // select random proxy ip from that KV list
         let proxyip_index = (rand_buf[0] as usize) % proxy_kv[&proxyip].len();
         proxyip = proxy_kv[&proxyip][proxyip_index].clone().replace(":", "-");
     }
 
+    // lanjutkan seperti sebelumnya: kalau websocket dan proxyip cocok pola ip-port
     let upgrade = req.headers().get("Upgrade")?.unwrap_or_default();
     if upgrade == "websocket".to_string() && PROXYIP_PATTERN.is_match(&proxyip) {
         if let Some((addr, port_str)) = proxyip.split_once('-') {
@@ -91,6 +138,10 @@ async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> 
             }
         }
         
+        // NOTE: saat ini `protocol` hanya disimpan lokal; jika nanti kamu mau menyesuaikan path/ws headers
+        // berdasarkan protocol (mis. ganti path pada VMESS vs VLESS), kamu bisa menggunakan variable `protocol`
+        // di sini untuk mengubah perilaku (mis. set subprotocols, path, dsb).
+
         let WebSocketPair { server, client } = WebSocketPair::new()?;
         server.accept()?;
     
