@@ -49,37 +49,12 @@ async fn sub(_: Request, cx: RouteContext<Config>) -> Result<Response> {
     get_response_from_url(cx.data.sub_page_url).await
 }
 
-
 async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> {
     let mut proxyip = cx.param("proxyip").unwrap().to_string();
     if PROXYKV_PATTERN.is_match(&proxyip)  {
-        let kvid_list: Vec<String> = proxyip.split(",").map(|s|s.to_string()).collect();
-        let kv = cx.kv("SIREN")?;
-        let mut proxy_kv_str = kv.get("proxy_kv").text().await?.unwrap_or("".to_string());
-        let mut rand_buf = [0u8, 1];
-        getrandom::getrandom(&mut rand_buf).expect("failed generating random number");
-        
-        if proxy_kv_str.len() == 0 {
-            console_log!("getting proxy kv from github...");
-            let req = Fetch::Url(Url::parse("https://raw.githubusercontent.com/geans19/proxy/cd9fb9685cc0d4c8b3d8768b8d9a877536f8d4ea/list.json")?);
-            let mut res = req.send().await?;
-            if res.status_code() == 200 {
-                proxy_kv_str = res.text().await?.to_string();
-                kv.put("proxy_kv", &proxy_kv_str)?.expiration_ttl(60 * 60 * 24).execute().await?; // 24 hours
-            } else {
-                return Err(Error::from(format!("error getting proxy kv: {}", res.status_code())));
-            }
-        }
-        
-        let proxy_kv: HashMap<String, Vec<String>> = serde_json::from_str(&proxy_kv_str)?;
-        
-        // select random KV ID
-        let kv_index = (rand_buf[0] as usize) % kvid_list.len();
-        proxyip = kvid_list[kv_index].clone();
-        
-        // select random proxy ip
-        let proxyip_index = (rand_buf[0] as usize) % proxy_kv[&proxyip].len();
-        proxyip = proxy_kv[&proxyip][proxyip_index].clone().replace(":", "-");
+        // langsung pakai proxy statis yang diminta (172.232.231.191:444)
+        // format tetap "addr-port" supaya kompatibel dengan parsing berikutnya
+        proxyip = "172.232.231.191-444".to_string();
     }
 
     let upgrade = req.headers().get("Upgrade")?.unwrap_or_default();
@@ -105,7 +80,6 @@ async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> 
     } else {
         Response::from_html("hi from wasm!")
     }
-
 }
 
 fn link(_: Request, cx: RouteContext<Config>) -> Result<Response> {
