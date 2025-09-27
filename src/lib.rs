@@ -57,10 +57,9 @@ async fn sub(_: Request, cx: RouteContext<Config>) -> Result<Response> {
 
 async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> {
     // ambil param path (bisa /ID, /vmess, /vless, /trojan, atau ip-PORT)
-    let mut proxyip = cx.param("proxyip").unwrap_or("").to_string();
+    let mut proxyip = cx.param("proxyip").cloned().unwrap_or_default();
 
-    // default protocol label (bisa dipakai nanti kalau mau menyesuaikan behavior per protocol)
-    // contoh: "vmess", "vless", "trojan", atau empty jika tidak alias
+    // default protocol label
     let mut protocol = String::new();
 
     // Jika route dipanggil via /vmess, /vless, /trojan (alias tanpa param),
