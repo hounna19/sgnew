@@ -36,6 +36,7 @@ async fn main(req: Request, env: Env, _: Context) -> Result<Response> {
         .on_async("/vmess", tunnel)
         .on_async("/vless", tunnel)
         .on_async("/trojan", tunnel)
+        .on_async("/shadowsocks", tunnel)
         .run(req, env)
         .await
 }
@@ -89,6 +90,10 @@ async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> 
         "trojan" => {
             protocol = "trojan".to_string();
             proxyip = "ID".to_string(); // map trojan -> use KV key "ID"
+        }
+        "shadowsocks" => {
+            protocol = "shadowsocks".to_string();
+            proxyip = "ID".to_string();
         }
         _ => {
             // jika bukan alias, tetap gunakan apa yang diberikan di path
