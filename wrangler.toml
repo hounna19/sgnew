@@ -1,11 +1,11 @@
-name = "sgnew"
+name = "sgmic"
 main = "build/worker/shim.mjs"
 compatibility_date = "2024-05-23"
 minify = true
 
 [[kv_namespaces]]
 binding = "SIREN"
-id = "66a848bdcaea433ca9abb9d2426c49a9"
+id = "87bb7b5992de48df99343d1b7fea6610"
 
 [build]
 command = "cargo install worker-build && worker-build --release"
@@ -14,6 +14,6 @@ command = "cargo install worker-build && worker-build --release"
 build = { command = "cargo install worker-build && worker-build --dev" }
 
 [vars]
-UUID = "8333d4a7-344c-4c52-957c-717b5a197993"
+UUID = "daf56748-0532-40d0-bda1-9ae486a6abef"
 MAIN_PAGE_URL = "https://raw.githubusercontent.com/hounna19/sgnew/refs/heads/master/web/index.html"
 SUB_PAGE_URL = "https://raw.githubusercontent.com/hounna19/sgnew/refs/heads/master/web/sub.html"
